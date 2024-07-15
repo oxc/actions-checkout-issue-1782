@@ -1,0 +1,64 @@
+name: Demo for non-standard ref names issue
+
+on:
+  workflow_dispatch:
+
+jobs:
+  push_ref:
+    name: Create non-standard ref name
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.push.outputs.ref }}
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Create dummy commit, and push as non-standard ref
+        id: push
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          echo "Dummy" > dummy
+          git add dummy
+          git commit -m 'Dummy commit (run id ${{ github.run_id }})'
+          git push origin HEAD:$REF
+          echo "ref=$REF" >> $GITHUB_OUTPUTS
+        env:
+          REF: "refs/deploy-bot/${{ github.run_id }}/merge"
+
+  checkout_old_working:
+    name: Checkout non-standard ref name (working @4.1.6)
+    runs-on: ubuntu-latest
+    needs: push_ref
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4.1.6
+        with:
+          ref: ${{ needs.push_ref.outputs.ref }}
+
+      - name: Show latest commit
+        run: |
+          git log -1
+          cat dummy
+
+  checkout_new_failing:
+    name: Checkout non-standard ref name (failing @ > 4.1.6)
+    runs-on: ubuntu-latest
+    needs: push_ref
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.push_ref.outputs.ref }}
+
+      - name: Show latest commit
+        run: |
+          git log -1
+          cat dummy
+
